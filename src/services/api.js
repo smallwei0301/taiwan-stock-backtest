@@ -8,6 +8,11 @@ export const searchStocks = async (query) => {
     const response = await axios.get(`${API_BASE_URL}/stocks/search`, {
       params: { query }
     });
+
+    if (!Array.isArray(response.data)) {
+      throw new Error('API 回傳格式錯誤：預期為股票陣列');
+    }
+
     return response.data;
   } catch (error) {
     console.error('搜索股票時發生錯誤:', error);

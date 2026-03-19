@@ -32,10 +32,11 @@ const StockSelectPage = () => {
     try {
       // 調用API搜索股票
       const results = await searchStocks(value);
-      setSearchResults(results);
+      const safeResults = Array.isArray(results) ? results : [];
+      setSearchResults(safeResults);
       setLoading(false);
-      
-      if (results.length === 0) {
+
+      if (safeResults.length === 0) {
         setError('找不到符合的股票，請嘗試其他關鍵字');
       }
     } catch (err) {
