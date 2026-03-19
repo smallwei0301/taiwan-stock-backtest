@@ -11,8 +11,8 @@ const { TabPane } = Tabs;
 const StrategySettingPage = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
-  const [selectedIndicators, setSelectedIndicators] = useState([]);
-  const [selectedStrategy, setSelectedStrategy] = useState(null);
+  const [selectedIndicators, setSelectedIndicators] = useState(['ma']);
+  const [selectedStrategy, setSelectedStrategy] = useState('ma_cross');
   const [loading, setLoading] = useState(false);
   const [stockData, setStockData] = useState(null);
   const [loadingStock, setLoadingStock] = useState(false);
@@ -336,9 +336,12 @@ const StrategySettingPage = () => {
         form={form}
         name="strategy_form"
         onFinish={onFinish}
+        onFinishFailed={() => message.warning('請先完成「技術指標」與「交易策略」必填欄位')}
         layout="vertical"
         className="strategy-form"
         initialValues={{
+          indicators: ['ma'],
+          strategy_type: 'ma_cross',
           backtest_period: 365,
           initial_capital: 1000000,
           position_size: 0.1,

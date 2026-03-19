@@ -11,6 +11,7 @@ const { TabPane } = Tabs;
 const ParameterOptimizationPage = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
+  const watchedStrategyType = Form.useWatch('strategy_type', form) || 'ma_cross';
   const [optimizationResults, setOptimizationResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [stockData, setStockData] = useState(null);
@@ -53,50 +54,67 @@ const ParameterOptimizationPage = () => {
     try {
       // 準備策略參數
       const strategyType = values.strategy_type || 'ma_cross';
-      
+
+      const safeRange = (min, max, step = 1) => {
+        if (!Number.isFinite(min) || !Number.isFinite(max) || min > max || step <= 0) return [];
+        const result = [];
+        for (let n = min; n <= max; n += step) result.push(Number(n.toFixed(6)));
+        return result;
+      };
+
       // 準備參數範圍
       const paramRanges = {};
-      
+
       if (strategyType === 'ma_cross') {
-        paramRanges.short = Array.from(
-          { length: (values.params?.ma?.short_max - values.params?.ma?.short_min) / 1 + 1 },
-          (_, i) => values.params?.ma?.short_min + i
-        );
-        
-        paramRanges.long = Array.from(
-          { length: (values.params?.ma?.long_max - values.params?.ma?.long_min) / 5 + 1 },
-          (_, i) => values.params?.ma?.long_min + i * 5
-        );
+        const shortMin = Number(values.params?.ma?.short_min ?? 5);
+        const shortMax = Number(values.params?.ma?.short_max ?? 15);
+        const longMin = Number(values.params?.ma?.long_min ?? 20);
+        const longMax = Number(values.params?.ma?.long_max ?? 50);
+
+        paramRanges.short = safeRange(shortMin, shortMax, 1);
+        paramRanges.long = safeRange(longMin, longMax, 5);
       } else if (strategyType === 'rsi') {
-        paramRanges.period = Array.from(
-          { length: (values.params?.rsi?.period_max - values.params?.rsi?.period_min) / 2 + 1 },
-          (_, i) => values.params?.rsi?.period_min + i * 2
-        );
-        
-        paramRanges.overbought = Array.from(
-          { length: (values.params?.rsi?.overbought_max - values.params?.rsi?.overbought_min) / 5 + 1 },
-          (_, i) => values.params?.rsi?.overbought_min + i * 5
-        );
-        
-        paramRanges.oversold = Array.from(
-          { length: (values.params?.rsi?.oversold_max - values.params?.rsi?.oversold_min) / 5 + 1 },
-          (_, i) => values.params?.rsi?.oversold_min + i * 5
-        );
+        const periodMin = Number(values.params?.rsi?.period_min ?? 7);
+        const periodMax = Number(values.params?.rsi?.period_max ?? 21);
+        const overboughtMin = Number(values.params?.rsi?.overbought_min ?? 65);
+        const overboughtMax = Number(values.params?.rsi?.overbought_max ?? 80);
+        const oversoldMin = Number(values.params?.rsi?.oversold_min ?? 20);
+        const oversoldMax = Number(values.params?.rsi?.oversold_max ?? 35);
+
+        paramRanges.period = safeRange(periodMin, periodMax, 2);
+        paramRanges.overbought = safeRange(overboughtMin, overboughtMax, 5);
+        paramRanges.oversold = safeRange(oversoldMin, oversoldMax, 5);
       }
-      
+
+      if (Object.values(paramRanges).some((arr) => !arr.length)) {
+        message.error('參數範圍無效，請檢查最小值/最大值設定');
+        setLoading(false);
+        return;
+      }
+
+      const targetMetricMap = {
+        return: 'total_return',
+        sharpe: 'sharpe_ratio',
+        drawdown: 'max_drawdown',
+        custom: 'sharpe_ratio'
+      };
+
       // 執行參數優化
       const optimizationResult = await runOptimization(
         stockData.price_data,
         { type: strategyType },
         {
           method: values.optimization_method,
-          target_metric: values.target_metric,
+          target_metric: targetMetricMap[values.target_metric] || 'sharpe_ratio',
           param_ranges: paramRanges
         },
         values.initial_capital || 1000000
       );
       
-      setOptimizationResults(optimizationResult);
+      setOptimizationResults({
+        ...optimizationResult,
+        target_metric: values.target_metric
+      });
       
       // 將最佳參數保存到本地存儲
       localStorage.setItem('optimizedParams', JSON.stringify(optimizationResult.best_params));
@@ -293,7 +311,7 @@ const ParameterOptimizationPage = () => {
               style={{ marginBottom: 16 }}
             />
             
-            {form.getFieldValue('strategy_type') === 'ma_cross' && (
+            {watchedStrategyType === 'ma_cross' && (
               <Card title="移動平均線參數範圍" size="small" style={{ marginBottom: 16 }}>
                 <Form.Item label="短期MA範圍">
                   <Space style={{ display: 'flex', marginBottom: 8 }}>
@@ -327,7 +345,7 @@ const ParameterOptimizationPage = () => {
               </Card>
             )}
             
-            {form.getFieldValue('strategy_type') === 'rsi' && (
+            {watchedStrategyType === 'rsi' && (
               <Card title="RSI參數範圍" size="small" style={{ marginBottom: 16 }}>
                 <Form.Item label="RSI週期範圍">
                   <Space style={{ display: 'flex', marginBottom: 8 }}>
